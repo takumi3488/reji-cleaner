@@ -1,0 +1,21 @@
+name: Test
+description: Run tests for Bun project
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+    
+    - name: Install dependencies
+      shell: bash
+      run: bun install
+    
+    - name: Run tests
+      shell: bash
+      run: bun test
+    
+    - name: Run lint
+      shell: bash
+      run: bun run lint

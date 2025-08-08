@@ -1,0 +1,7 @@
+{
+    "defaultSeverity": "warn",
+    "rules": {
+        "semicolon": true,
+        "interface-name": true
+    }
+}
