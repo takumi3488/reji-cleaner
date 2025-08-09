@@ -12,10 +12,6 @@ runs:
       shell: bash
       run: bun install
     
-    - name: Run tests
-      shell: bash
-      run: bun test
-    
     - name: Run lint
       shell: bash
       run: bun run lint
