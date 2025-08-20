@@ -15,6 +15,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@typescript/native-preview": "^7.0.0-dev.20250819.1"
+    "@typescript/native-preview": "^7.0.0-dev.20250820.1"
   }
 }
