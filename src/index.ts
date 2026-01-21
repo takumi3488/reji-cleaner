@@ -28,6 +28,35 @@ interface DockerManifest {
 
 interface DockerConfig {
 	created?: string;
+	config?: {
+		Labels?: Record<string, string>;
+	};
+}
+
+// OCI Referrers API response
+interface ReferrersResponse {
+	manifests?: Array<{
+		mediaType: string;
+		digest: string;
+		artifactType?: string;
+	}>;
+}
+
+// SLSA Provenance / in-toto attestation
+interface Attestation {
+	predicate?: {
+		runDetails?: {
+			metadata?: {
+				startedOn?: string;
+				finishedOn?: string;
+			};
+		};
+		// SLSA v0.2 format
+		metadata?: {
+			buildStartedOn?: string;
+			buildFinishedOn?: string;
+		};
+	};
 }
 
 // Helper for colored output
@@ -74,7 +103,7 @@ class DockerRegistryClient {
 			...additionalHeaders,
 		};
 		if (this.authHeader) {
-			// @ts-ignore
+			// @ts-expect-error
 			headers.Authorization = this.authHeader;
 		}
 		return headers;
@@ -205,6 +234,73 @@ class DockerRegistryClient {
 		}
 	}
 
+	async getReferrers(
+		repository: string,
+		digest: string,
+	): Promise<ReferrersResponse | null> {
+		try {
+			const response = await fetch(
+				`${this.config.registryUrl}/v2/${repository}/referrers/${digest}`,
+				{
+					headers: this.getHeaders(),
+				},
+			);
+			if (!response.ok) {
+				return null;
+			}
+			return (await response.json()) as ReferrersResponse;
+		} catch {
+			return null;
+		}
+	}
+
+	async getAttestationBuildTime(
+		repository: string,
+		manifestDigest: string,
+	): Promise<string | null> {
+		try {
+			const referrers = await this.getReferrers(repository, manifestDigest);
+			if (!referrers?.manifests) return null;
+
+			// Find attestation manifest (SLSA provenance or in-toto)
+			const attestationManifest = referrers.manifests.find(
+				(m) =>
+					m.artifactType?.includes("intoto") ||
+					m.artifactType?.includes("provenance") ||
+					m.mediaType.includes("intoto") ||
+					m.mediaType.includes("attestation"),
+			);
+
+			if (!attestationManifest) return null;
+
+			// Fetch the attestation blob
+			const response = await fetch(
+				`${this.config.registryUrl}/v2/${repository}/blobs/${attestationManifest.digest}`,
+				{
+					headers: this.getHeaders(),
+				},
+			);
+
+			if (!response.ok) return null;
+
+			const attestation = (await response.json()) as Attestation;
+
+			// SLSA v1.0 format: predicate.runDetails.metadata.startedOn
+			if (attestation.predicate?.runDetails?.metadata?.startedOn) {
+				return attestation.predicate.runDetails.metadata.startedOn;
+			}
+
+			// SLSA v0.2 format: predicate.metadata.buildStartedOn
+			if (attestation.predicate?.metadata?.buildStartedOn) {
+				return attestation.predicate.metadata.buildStartedOn;
+			}
+
+			return null;
+		} catch {
+			return null;
+		}
+	}
+
 	async getTagCreatedTime(
 		repository: string,
 		tag: string,
@@ -216,8 +312,17 @@ class DockerRegistryClient {
 			// For manifest v2
 			if (manifest.config?.digest) {
 				const config = await this.getConfig(repository, manifest.config.digest);
+
+				// 1. Try config.created first
 				if (config?.created) {
 					return config.created;
+				}
+
+				// 2. Try org.opencontainers.image.created label
+				const ociCreated =
+					config?.config?.Labels?.["org.opencontainers.image.created"];
+				if (ociCreated) {
+					return ociCreated;
 				}
 			}
 
@@ -226,6 +331,18 @@ class DockerRegistryClient {
 				const v1Data = JSON.parse(manifest.history[0].v1Compatibility);
 				if (v1Data.created) {
 					return v1Data.created;
+				}
+			}
+
+			// 3. Try attestation buildStartedOn
+			const manifestDigest = await this.getManifestDigest(repository, tag);
+			if (manifestDigest) {
+				const attestationTime = await this.getAttestationBuildTime(
+					repository,
+					manifestDigest,
+				);
+				if (attestationTime) {
+					return attestationTime;
 				}
 			}
 
