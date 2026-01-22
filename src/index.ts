@@ -450,7 +450,7 @@ class DockerRegistryClient {
 			// Find the latest semver tag that's not already in the keep list
 			const latestSemverTag = tagInfoList.find(
 				(t) =>
-					isSemverTag(t.name) && !tagsToKeep.some((k) => k.digest === t.digest),
+					isSemverTag(t.name) && !tagsToKeep.some((k) => k.name === t.name),
 			);
 			if (latestSemverTag) {
 				tagsToKeep.push(latestSemverTag);
