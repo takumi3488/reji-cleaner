@@ -6,6 +6,15 @@ interface Config {
 	dryRun: boolean;
 	repositories?: string[]; // Process only specific repositories if specified
 	deleteUntagged?: boolean; // Whether to also delete untagged manifests
+	retentionCount: number; // Number of latest tags to retain (default: 5)
+}
+
+// Semver pattern to match semantic versioning tags
+// Matches: v1.0.0, 1.0.0, v1.2.3-beta, 1.0.0-rc.1, etc.
+const SEMVER_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:-[\w.]+)?(?:\+[\w.]+)?$/;
+
+function isSemverTag(tag: string): boolean {
+	return SEMVER_PATTERN.test(tag);
 }
 
 // Tag information
@@ -415,47 +424,73 @@ class DockerRegistryClient {
 			digestToTags.set(digest, existingTags);
 		}
 
-		// Identify the latest tag
-		let latestTag: TagInfo | null = null;
-		if (tagInfoList.length > 0) {
-			// Sort by creation time (those without time go last)
-			tagInfoList.sort((a, b) => {
-				if (!a.created && !b.created) return 0;
-				if (!a.created) return 1;
-				if (!b.created) return -1;
-				return b.created.localeCompare(a.created);
-			});
-			latestTag = tagInfoList[0] || null;
-		}
-
-		if (!latestTag) {
+		// Sort by creation time (those without time go last)
+		if (tagInfoList.length === 0) {
 			this.log(
 				"warn",
-				`Could not determine latest tag for repository: ${repository}`,
+				`Could not determine any tags for repository: ${repository}`,
 			);
 			return { deleted: 0, kept: 0 };
 		}
 
+		tagInfoList.sort((a, b) => {
+			if (!a.created && !b.created) return 0;
+			if (!a.created) return 1;
+			if (!b.created) return -1;
+			return b.created.localeCompare(a.created);
+		});
+
+		// Select tags to keep (top N by creation time)
+		const retentionCount = this.config.retentionCount;
+		const tagsToKeep = tagInfoList.slice(0, retentionCount);
+
+		// Ensure at least one semver tag is retained
+		const hasSemverInKeep = tagsToKeep.some((t) => isSemverTag(t.name));
+		if (!hasSemverInKeep) {
+			// Find the latest semver tag that's not already in the keep list
+			const latestSemverTag = tagInfoList.find(
+				(t) =>
+					isSemverTag(t.name) && !tagsToKeep.some((k) => k.name === t.name),
+			);
+			if (latestSemverTag) {
+				tagsToKeep.push(latestSemverTag);
+				this.log(
+					"info",
+					`Adding semver tag to retention: ${colors.magenta}${latestSemverTag.name}${colors.reset}`,
+				);
+			}
+		}
+
+		// Collect digests to keep
+		const digestsToKeep = new Set<string>();
+		for (const tag of tagsToKeep) {
+			digestsToKeep.add(tag.digest);
+		}
+
+		// Log retention info
 		this.log(
 			"info",
-			`Latest tag: ${colors.green}${latestTag.name}${colors.reset} (created: ${latestTag.created || "unknown"})`,
+			`Retaining ${colors.green}${tagsToKeep.length}${colors.reset} tag(s):`,
 		);
-		this.log(
-			"info",
-			`Latest digest: ${colors.green}${latestTag.digest.substring(0, 12)}...${colors.reset}`,
-		);
+		for (const tag of tagsToKeep) {
+			const semverIndicator = isSemverTag(tag.name)
+				? ` ${colors.magenta}[semver]${colors.reset}`
+				: "";
+			this.log(
+				"info",
+				`  - ${colors.green}${tag.name}${colors.reset}${semverIndicator} (created: ${tag.created || "unknown"})`,
+			);
+		}
 
 		// Determine targets for deletion
 		const digestsToDelete = new Set<string>();
-		const digestsToKeep = new Set<string>();
 
 		for (const [digest, associatedTags] of digestToTags.entries()) {
-			if (digest === latestTag.digest) {
+			if (digestsToKeep.has(digest)) {
 				this.log(
 					"info",
 					`Keeping: ${colors.green}${digest.substring(0, 12)}...${colors.reset} (tags: ${associatedTags.join(", ")})`,
 				);
-				digestsToKeep.add(digest);
 			} else {
 				this.log(
 					"info",
@@ -486,6 +521,10 @@ class DockerRegistryClient {
 		this.log(
 			"info",
 			`Dry run mode: ${this.config.dryRun ? `${colors.yellow}ENABLED` : `${colors.green}DISABLED`}${colors.reset}`,
+		);
+		this.log(
+			"info",
+			`Tag retention: ${colors.cyan}${this.config.retentionCount}${colors.reset} latest tags (+ 1 semver if available)`,
 		);
 		this.log("info", "=".repeat(60));
 
@@ -555,6 +594,7 @@ async function main() {
 		dryRun: process.env.DRY_RUN !== "false", // Default is true
 		repositories: process.env.REPOSITORIES?.split(",").filter((r) => r.trim()),
 		deleteUntagged: process.env.DELETE_UNTAGGED === "true",
+		retentionCount: Number.parseInt(process.env.RETENTION_COUNT || "5", 10),
 	};
 
 	const client = new DockerRegistryClient(config);
