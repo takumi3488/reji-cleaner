@@ -524,7 +524,7 @@ class DockerRegistryClient {
 		);
 		this.log(
 			"info",
-			`Tag retention: ${colors.cyan}${this.config.retentionCount}${colors.reset} latest tags (+ 1 semver minimum)`,
+			`Tag retention: ${colors.cyan}${this.config.retentionCount}${colors.reset} latest tags (+ 1 semver if available)`,
 		);
 		this.log("info", "=".repeat(60));
 
