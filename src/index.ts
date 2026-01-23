@@ -6,7 +6,7 @@ interface Config {
 	dryRun: boolean;
 	repositories?: string[]; // Process only specific repositories if specified
 	deleteUntagged?: boolean; // Whether to also delete untagged manifests
-	retentionCount: number; // Number of latest tags to retain (default: 5)
+	retentionCount: number; // Number of latest tags to retain (default: 10)
 }
 
 // Semver pattern to match semantic versioning tags
@@ -594,7 +594,7 @@ async function main() {
 		dryRun: process.env.DRY_RUN !== "false", // Default is true
 		repositories: process.env.REPOSITORIES?.split(",").filter((r) => r.trim()),
 		deleteUntagged: process.env.DELETE_UNTAGGED === "true",
-		retentionCount: Number.parseInt(process.env.RETENTION_COUNT || "5", 10),
+		retentionCount: Number.parseInt(process.env.RETENTION_COUNT || "10", 10),
 	};
 
 	const client = new DockerRegistryClient(config);
