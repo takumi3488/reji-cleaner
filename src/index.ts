@@ -6,7 +6,7 @@ interface Config {
 	dryRun: boolean;
 	repositories?: string[]; // Process only specific repositories if specified
 	deleteUntagged?: boolean; // Whether to also delete untagged manifests
-	retentionCount: number; // Number of latest tags to retain (default: 10)
+	retentionCount: number; // Number of latest 'other' tags to retain (default: 5, semver and cache tags each keep 1)
 }
 
 // Semver pattern to match semantic versioning tags
@@ -15,6 +15,14 @@ const SEMVER_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:-[\w.]+)?(?:\+[\w.]+)?$/;
 
 function isSemverTag(tag: string): boolean {
 	return SEMVER_PATTERN.test(tag);
+}
+
+// Cache tag pattern to match cache-related tags
+// Matches: cache, cache-*, buildcache-*, *-cache, etc.
+const CACHE_PATTERN = /^(cache|buildcache)(-.*)?$|^.*-cache$/i;
+
+function isCacheTag(tag: string): boolean {
+	return CACHE_PATTERN.test(tag);
 }
 
 // Tag information
@@ -433,32 +441,60 @@ class DockerRegistryClient {
 			return { deleted: 0, kept: 0 };
 		}
 
-		tagInfoList.sort((a, b) => {
+		const sortByCreated = (a: TagInfo, b: TagInfo) => {
 			if (!a.created && !b.created) return 0;
 			if (!a.created) return 1;
 			if (!b.created) return -1;
 			return b.created.localeCompare(a.created);
-		});
+		};
 
-		// Select tags to keep (top N by creation time)
-		const retentionCount = this.config.retentionCount;
-		const tagsToKeep = tagInfoList.slice(0, retentionCount);
+		// Categorize tags into semver, cache, and others
+		const semverTags: TagInfo[] = [];
+		const cacheTags: TagInfo[] = [];
+		const otherTags: TagInfo[] = [];
 
-		// Ensure at least one semver tag is retained
-		const hasSemverInKeep = tagsToKeep.some((t) => isSemverTag(t.name));
-		if (!hasSemverInKeep) {
-			// Find the latest semver tag that's not already in the keep list
-			const latestSemverTag = tagInfoList.find(
-				(t) =>
-					isSemverTag(t.name) && !tagsToKeep.some((k) => k.name === t.name),
-			);
-			if (latestSemverTag) {
-				tagsToKeep.push(latestSemverTag);
-				this.log(
-					"info",
-					`Adding semver tag to retention: ${colors.magenta}${latestSemverTag.name}${colors.reset}`,
-				);
+		for (const tag of tagInfoList) {
+			if (isSemverTag(tag.name)) {
+				semverTags.push(tag);
+			} else if (isCacheTag(tag.name)) {
+				cacheTags.push(tag);
+			} else {
+				otherTags.push(tag);
 			}
+		}
+
+		// Sort each category by creation time
+		semverTags.sort(sortByCreated);
+		cacheTags.sort(sortByCreated);
+		otherTags.sort(sortByCreated);
+
+		// Apply retention rules:
+		// - Semver tags: keep only the latest 1
+		// - Cache tags: keep only the latest 1
+		// - Other tags: keep up to retentionCount (default 5)
+		const tagsToKeep: TagInfo[] = [];
+
+		// Keep latest semver tag (1)
+		if (semverTags.length > 0) {
+			tagsToKeep.push(semverTags[0]);
+			this.log("info", `Semver tags: keeping latest 1 of ${semverTags.length}`);
+		}
+
+		// Keep latest cache tag (1)
+		if (cacheTags.length > 0) {
+			tagsToKeep.push(cacheTags[0]);
+			this.log("info", `Cache tags: keeping latest 1 of ${cacheTags.length}`);
+		}
+
+		// Keep up to retentionCount other tags
+		const retentionCount = this.config.retentionCount;
+		const otherTagsToKeep = otherTags.slice(0, retentionCount);
+		tagsToKeep.push(...otherTagsToKeep);
+		if (otherTags.length > 0) {
+			this.log(
+				"info",
+				`Other tags: keeping ${otherTagsToKeep.length} of ${otherTags.length}`,
+			);
 		}
 
 		// Collect digests to keep
@@ -473,12 +509,15 @@ class DockerRegistryClient {
 			`Retaining ${colors.green}${tagsToKeep.length}${colors.reset} tag(s):`,
 		);
 		for (const tag of tagsToKeep) {
-			const semverIndicator = isSemverTag(tag.name)
-				? ` ${colors.magenta}[semver]${colors.reset}`
-				: "";
+			let typeIndicator = "";
+			if (isSemverTag(tag.name)) {
+				typeIndicator = ` ${colors.magenta}[semver]${colors.reset}`;
+			} else if (isCacheTag(tag.name)) {
+				typeIndicator = ` ${colors.cyan}[cache]${colors.reset}`;
+			}
 			this.log(
 				"info",
-				`  - ${colors.green}${tag.name}${colors.reset}${semverIndicator} (created: ${tag.created || "unknown"})`,
+				`  - ${colors.green}${tag.name}${colors.reset}${typeIndicator} (created: ${tag.created || "unknown"})`,
 			);
 		}
 
@@ -524,7 +563,7 @@ class DockerRegistryClient {
 		);
 		this.log(
 			"info",
-			`Tag retention: ${colors.cyan}${this.config.retentionCount}${colors.reset} latest tags (+ 1 semver if available)`,
+			`Tag retention: semver=${colors.magenta}1${colors.reset}, cache=${colors.cyan}1${colors.reset}, other=${colors.green}${this.config.retentionCount}${colors.reset}`,
 		);
 		this.log("info", "=".repeat(60));
 
@@ -594,7 +633,7 @@ async function main() {
 		dryRun: process.env.DRY_RUN !== "false", // Default is true
 		repositories: process.env.REPOSITORIES?.split(",").filter((r) => r.trim()),
 		deleteUntagged: process.env.DELETE_UNTAGGED === "true",
-		retentionCount: Number.parseInt(process.env.RETENTION_COUNT || "10", 10),
+		retentionCount: Number.parseInt(process.env.RETENTION_COUNT || "5", 10),
 	};
 
 	const client = new DockerRegistryClient(config);
