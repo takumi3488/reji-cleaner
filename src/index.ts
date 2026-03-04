@@ -25,6 +25,14 @@ function isCacheTag(tag: string): boolean {
 	return CACHE_PATTERN.test(tag);
 }
 
+// Timestamp tag pattern: YYYYmmddHHMMSS (14-digit numeric)
+const TIMESTAMP_PATTERN =
+	/^\d{4}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])([01]\d|2[0-3])([0-5]\d){2}$/;
+
+function isTimestampTag(tag: string): boolean {
+	return TIMESTAMP_PATTERN.test(tag);
+}
+
 // Tag information
 interface TagInfo {
 	name: string;
@@ -448,9 +456,10 @@ class DockerRegistryClient {
 			return b.created.localeCompare(a.created);
 		};
 
-		// Categorize tags into semver, cache, and others
+		// Categorize tags into semver, cache, timestamp, and others
 		const semverTags: TagInfo[] = [];
 		const cacheTags: TagInfo[] = [];
+		const timestampTags: TagInfo[] = [];
 		const otherTags: TagInfo[] = [];
 
 		for (const tag of tagInfoList) {
@@ -458,14 +467,17 @@ class DockerRegistryClient {
 				semverTags.push(tag);
 			} else if (isCacheTag(tag.name)) {
 				cacheTags.push(tag);
+			} else if (isTimestampTag(tag.name)) {
+				timestampTags.push(tag);
 			} else {
 				otherTags.push(tag);
 			}
 		}
 
-		// Sort each category by creation time
+		// Sort each category by creation time (timestamp tags sorted by tag name descending)
 		semverTags.sort(sortByCreated);
 		cacheTags.sort(sortByCreated);
+		timestampTags.sort((a, b) => b.name.localeCompare(a.name));
 		otherTags.sort(sortByCreated);
 
 		// Apply retention rules:
@@ -484,6 +496,15 @@ class DockerRegistryClient {
 		if (cacheTags.length > 0) {
 			tagsToKeep.push(cacheTags[0]);
 			this.log("info", `Cache tags: keeping latest 1 of ${cacheTags.length}`);
+		}
+
+		// Keep latest timestamp tag (1)
+		if (timestampTags.length > 0) {
+			tagsToKeep.push(timestampTags[0]);
+			this.log(
+				"info",
+				`Timestamp tags: keeping latest 1 of ${timestampTags.length}`,
+			);
 		}
 
 		// Keep up to retentionCount other tags
@@ -514,6 +535,8 @@ class DockerRegistryClient {
 				typeIndicator = ` ${colors.magenta}[semver]${colors.reset}`;
 			} else if (isCacheTag(tag.name)) {
 				typeIndicator = ` ${colors.cyan}[cache]${colors.reset}`;
+			} else if (isTimestampTag(tag.name)) {
+				typeIndicator = ` ${colors.blue}[timestamp]${colors.reset}`;
 			}
 			this.log(
 				"info",
