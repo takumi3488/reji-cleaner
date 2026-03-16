@@ -677,4 +677,4 @@ if (require.main === module) {
 	main().catch(console.error);
 }
 
-export { DockerRegistryClient, type Config };
+export { type Config, DockerRegistryClient };
