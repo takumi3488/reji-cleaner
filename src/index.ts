@@ -43,12 +43,25 @@ interface TagInfo {
 
 // Docker Registry API response types
 interface DockerManifest {
+	mediaType?: string;
 	config?: {
 		digest: string;
 	};
 	history?: Array<{
 		v1Compatibility: string;
 	}>;
+	// manifest list / OCI image index 用
+	manifests?: Array<{
+		mediaType: string;
+		digest: string;
+		size?: number;
+		platform?: {
+			architecture: string;
+			os: string;
+		};
+		annotations?: Record<string, string>;
+	}>;
+	annotations?: Record<string, string>;
 }
 
 interface DockerConfig {
@@ -123,8 +136,12 @@ class DockerRegistryClient {
 
 	private getHeaders(additionalHeaders?: HeadersInit): HeadersInit {
 		const headers: HeadersInit = {
-			Accept:
-				"application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json",
+			Accept: [
+				"application/vnd.docker.distribution.manifest.v2+json",
+				"application/vnd.docker.distribution.manifest.list.v2+json",
+				"application/vnd.oci.image.manifest.v1+json",
+				"application/vnd.oci.image.index.v1+json",
+			].join(", "),
 			...additionalHeaders,
 		};
 		if (this.authHeader) {
@@ -326,13 +343,56 @@ class DockerRegistryClient {
 		}
 	}
 
+	private isManifestList(manifest: DockerManifest): boolean {
+		const mt = manifest.mediaType;
+		if (
+			mt === "application/vnd.docker.distribution.manifest.list.v2+json" ||
+			mt === "application/vnd.oci.image.index.v1+json"
+		) {
+			return true;
+		}
+		// mediaType未設定でもmanifests配列があればindex扱い
+		return Array.isArray(manifest.manifests) && manifest.manifests.length > 0;
+	}
+
+	// manifest list内からattestation等を除いた実イメージのdigestを選択(amd64優先)
+	private pickPrimaryChildDigest(manifest: DockerManifest): string | null {
+		if (!manifest.manifests || manifest.manifests.length === 0) return null;
+		const real = manifest.manifests.filter((m) => {
+			const arch = m.platform?.architecture;
+			const isAttestation =
+				m.annotations?.["vnd.docker.reference.type"] ===
+					"attestation-manifest" ||
+				arch === "unknown" ||
+				m.platform?.os === "unknown";
+			return !isAttestation;
+		});
+		const amd64 = real.find((m) => m.platform?.architecture === "amd64");
+		return (amd64 ?? real[0])?.digest ?? null;
+	}
+
 	async getTagCreatedTime(
 		repository: string,
 		tag: string,
 	): Promise<string | null> {
 		try {
-			const manifest = await this.getManifest(repository, tag);
+			let manifest = await this.getManifest(repository, tag);
 			if (!manifest) return null;
+
+			// manifest list (OCI Image Index) の場合
+			if (this.isManifestList(manifest)) {
+				// 1. Index自体のannotations
+				const indexCreated =
+					manifest.annotations?.["org.opencontainers.image.created"];
+				if (indexCreated) return indexCreated;
+
+				// 2. 子マニフェスト(amd64優先)を辿る
+				const childDigest = this.pickPrimaryChildDigest(manifest);
+				if (!childDigest) return null;
+				const child = await this.getManifest(repository, childDigest);
+				if (!child) return null;
+				manifest = child;
+			}
 
 			// For manifest v2
 			if (manifest.config?.digest) {
