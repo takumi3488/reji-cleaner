@@ -68,53 +68,53 @@
   dependencies:
     undici-types "~7.10.0"
 
-"@typescript/native-preview-darwin-arm64@7.0.0-dev.20260522.1":
-  version "7.0.0-dev.20260522.1"
-  resolved "https://registry.yarnpkg.com/@typescript/native-preview-darwin-arm64/-/native-preview-darwin-arm64-7.0.0-dev.20260522.1.tgz#0159da826e3aca345c18f09136a5af932d34c7b8"
-  integrity sha512-kp2JX8wSCQ5i8f5Zr30t9TdAIEw8s3MCvT1zEe6PJAHU7aUHTnRCM+oAHEM8QxM29VD/PxR6b5dVKxHtX7Ny/A==
+"@typescript/native-preview-darwin-arm64@7.0.0-dev.20260523.1":
+  version "7.0.0-dev.20260523.1"
+  resolved "https://registry.yarnpkg.com/@typescript/native-preview-darwin-arm64/-/native-preview-darwin-arm64-7.0.0-dev.20260523.1.tgz#242fcdd5e48bbaf6ed0a11a01ee3a7dba21f2ea0"
+  integrity sha512-4WHj9v41per176h00j3moITcHpR+8SNoAFdbDuJwUDCJiQkbrCjwulK8UwALxLPEGqyBdNARWcM6GXVTexBg1w==
 
-"@typescript/native-preview-darwin-x64@7.0.0-dev.20260522.1":
-  version "7.0.0-dev.20260522.1"
-  resolved "https://registry.yarnpkg.com/@typescript/native-preview-darwin-x64/-/native-preview-darwin-x64-7.0.0-dev.20260522.1.tgz#e39fc3fa2177ad23530da5c648ec249e2407013b"
-  integrity sha512-jX89E/hV/r0fOcP4+JWdKSugJXmWbOO74aC5a1U8+U7TBD1TTfK50Da+BL8Sf2Xud2ybqQ+2FUHAlBsLTC743g==
+"@typescript/native-preview-darwin-x64@7.0.0-dev.20260523.1":
+  version "7.0.0-dev.20260523.1"
+  resolved "https://registry.yarnpkg.com/@typescript/native-preview-darwin-x64/-/native-preview-darwin-x64-7.0.0-dev.20260523.1.tgz#ae47405295d02ae9a35af43c21ab980dd08d9c88"
+  integrity sha512-WeVqasFLVwbnwmjLhBTwfNminhaTfCo+ptOW2JT+IgY2WYBGIKXQmhaPPU5bdsHCur7O2RmY5tUAmvqv7V+kog==
 
-"@typescript/native-preview-linux-arm64@7.0.0-dev.20260522.1":
-  version "7.0.0-dev.20260522.1"
-  resolved "https://registry.yarnpkg.com/@typescript/native-preview-linux-arm64/-/native-preview-linux-arm64-7.0.0-dev.20260522.1.tgz#bce0733d1667d3f48b383679c40f9b9898306f2a"
-  integrity sha512-XFLpJNscLKqT6LLSBrv78DzLdzwFYOePeluRBF616KUPEcfiXliTan1YuHQh4m9i9o6tvW/NnuAPlr/Q8DObsg==
+"@typescript/native-preview-linux-arm64@7.0.0-dev.20260523.1":
+  version "7.0.0-dev.20260523.1"
+  resolved "https://registry.yarnpkg.com/@typescript/native-preview-linux-arm64/-/native-preview-linux-arm64-7.0.0-dev.20260523.1.tgz#6f920a54e39b37395fb135909ad6ee28f451ec65"
+  integrity sha512-2Jd0iJOd77LLwsEDFc9O5nfPxvs75d1FafG7BhGGlfD8RtxL4+BzAy8KYI0++TTmHL6aL7+VIr3+TQ58S68Sfw==
 
-"@typescript/native-preview-linux-arm@7.0.0-dev.20260522.1":
-  version "7.0.0-dev.20260522.1"
-  resolved "https://registry.yarnpkg.com/@typescript/native-preview-linux-arm/-/native-preview-linux-arm-7.0.0-dev.20260522.1.tgz#030ff78d23760ae95eaf4aca5323dd385c2ab56b"
-  integrity sha512-vItWfPtZfUQLaVJe0iClfsKSDtkUCUTp2LfEXBHqBCdWhoE3irg7Ivs41l3sp4zXlTio5SUvMzvO8/Mc2SImzA==
+"@typescript/native-preview-linux-arm@7.0.0-dev.20260523.1":
+  version "7.0.0-dev.20260523.1"
+  resolved "https://registry.yarnpkg.com/@typescript/native-preview-linux-arm/-/native-preview-linux-arm-7.0.0-dev.20260523.1.tgz#2d026cd22b7c9860225af47515e5075a25e14eea"
+  integrity sha512-C+fOL4DO/JTLkKT22Bw34FGiUpS4scqC+5AaaCVBCiHWXn1NknSrbvcMWEmg8HzCWPmiUwSQUryNZIFDqi8tUw==
 
-"@typescript/native-preview-linux-x64@7.0.0-dev.20260522.1":
-  version "7.0.0-dev.20260522.1"
-  resolved "https://registry.yarnpkg.com/@typescript/native-preview-linux-x64/-/native-preview-linux-x64-7.0.0-dev.20260522.1.tgz#b8d7f6ad07007e55029989e474a0950cd1154579"
-  integrity sha512-r5wkbqL+qpI3QN3GiF0dg5A0PD5x9cfYSSCD744+Ov35P8inuJSySjR44gdoOF3IcFTupPEc/4q4to/gId1kZQ==
+"@typescript/native-preview-linux-x64@7.0.0-dev.20260523.1":
+  version "7.0.0-dev.20260523.1"
+  resolved "https://registry.yarnpkg.com/@typescript/native-preview-linux-x64/-/native-preview-linux-x64-7.0.0-dev.20260523.1.tgz#81736e235614317dba9bfd29b556e8d9feaa6806"
+  integrity sha512-DiJLdnzh/TolhvDuGxqD1sxlQNnCFLsLLnGPVN6i+/DUPC/cWy0c+5RHruow9lQbtPkZ3aapztkYP2wEP1Ll6Q==
 
-"@typescript/native-preview-win32-arm64@7.0.0-dev.20260522.1":
-  version "7.0.0-dev.20260522.1"
-  resolved "https://registry.yarnpkg.com/@typescript/native-preview-win32-arm64/-/native-preview-win32-arm64-7.0.0-dev.20260522.1.tgz#8245d5270c2f4637ee4b6e6abfb5b4f0f890b458"
-  integrity sha512-Xtqw0dfE35WISVqN2J9hp21N6l5MT21DSgJ4w/cXisDZlaeT0Vq57CgUWUbLT4CEw5gs0QK6kmUFOSAP7Dga6Q==
+"@typescript/native-preview-win32-arm64@7.0.0-dev.20260523.1":
+  version "7.0.0-dev.20260523.1"
+  resolved "https://registry.yarnpkg.com/@typescript/native-preview-win32-arm64/-/native-preview-win32-arm64-7.0.0-dev.20260523.1.tgz#aef4b178566d1d58c6662a908a5c1e5ba48db2be"
+  integrity sha512-axyNrdvX4D6T5ZuZHhufFbPRiKzJyqxusLl5nI3wJqmGN3G5JYCJY9k39LjRYI6oB3ingyKng+3QJ2q7b3IHQA==
 
-"@typescript/native-preview-win32-x64@7.0.0-dev.20260522.1":
-  version "7.0.0-dev.20260522.1"
-  resolved "https://registry.yarnpkg.com/@typescript/native-preview-win32-x64/-/native-preview-win32-x64-7.0.0-dev.20260522.1.tgz#59e9319ef2294371b8f162835bc48d96aa49f4ca"
-  integrity sha512-CBTpf7skuTNgHzjwEbw3ujU76r/u9asENXc9xQmgj6qCJ1+ZHn34MMzolkUegwtHWfuem38ayYTJOMn2dmNQ5g==
+"@typescript/native-preview-win32-x64@7.0.0-dev.20260523.1":
+  version "7.0.0-dev.20260523.1"
+  resolved "https://registry.yarnpkg.com/@typescript/native-preview-win32-x64/-/native-preview-win32-x64-7.0.0-dev.20260523.1.tgz#2b013d2ab842e469b777c90ed4d12dea8030f830"
+  integrity sha512-NRBlDy12DLqCC7smCWlEgsiwCxUUl0TAVLUikm+c+WvFhnsY909jk1X8FNUHhNZmR3APHS57AMOq2rreQwHdiQ==
 
 "@typescript/native-preview@^7.0.0-dev.20250822.1":
-  version "7.0.0-dev.20260522.1"
-  resolved "https://registry.yarnpkg.com/@typescript/native-preview/-/native-preview-7.0.0-dev.20260522.1.tgz#ab9e14b732e50b71c29df6402ed722236fa105ed"
-  integrity sha512-NgnE3PE3/nr4Qr8p1uCIkaM5YmNa8hQGhzb8Olb6w09aocg4Wq8bjrFHe4qZH2kgV+Hl4gGXRNb9ww1P2fwc9Q==
+  version "7.0.0-dev.20260523.1"
+  resolved "https://registry.yarnpkg.com/@typescript/native-preview/-/native-preview-7.0.0-dev.20260523.1.tgz#012cbf1d69476c1b57caaa1a49d2f08abb2a0e38"
+  integrity sha512-+pkICUeoIbnecsvkEQFmkBC7qQqR5ltQQl+bXuGpKBOURVu2/zDA4i09Ef4KWWD6Kmx7i/EMO2fMZ3IsZEdzPw==
   optionalDependencies:
-    "@typescript/native-preview-darwin-arm64" "7.0.0-dev.20260522.1"
-    "@typescript/native-preview-darwin-x64" "7.0.0-dev.20260522.1"
-    "@typescript/native-preview-linux-arm" "7.0.0-dev.20260522.1"
-    "@typescript/native-preview-linux-arm64" "7.0.0-dev.20260522.1"
-    "@typescript/native-preview-linux-x64" "7.0.0-dev.20260522.1"
-    "@typescript/native-preview-win32-arm64" "7.0.0-dev.20260522.1"
-    "@typescript/native-preview-win32-x64" "7.0.0-dev.20260522.1"
+    "@typescript/native-preview-darwin-arm64" "7.0.0-dev.20260523.1"
+    "@typescript/native-preview-darwin-x64" "7.0.0-dev.20260523.1"
+    "@typescript/native-preview-linux-arm" "7.0.0-dev.20260523.1"
+    "@typescript/native-preview-linux-arm64" "7.0.0-dev.20260523.1"
+    "@typescript/native-preview-linux-x64" "7.0.0-dev.20260523.1"
+    "@typescript/native-preview-win32-arm64" "7.0.0-dev.20260523.1"
+    "@typescript/native-preview-win32-x64" "7.0.0-dev.20260523.1"
 
 bun-types@1.2.20:
   version "1.2.20"
