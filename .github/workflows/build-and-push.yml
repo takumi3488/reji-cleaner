@@ -44,10 +44,14 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
+    - name: Generate timestamp tag
+      id: timestamp
+      run: echo "tag=$(TZ=Asia/Tokyo date +'%Y%m%d%H%M%S')" >> "$GITHUB_OUTPUT"
+
     - name: Build and push
       uses: docker/build-push-action@v7
       with:
         context: .
         push: true
-        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.timestamp.outputs.tag }}
         labels: ${{ steps.meta.outputs.labels }}
