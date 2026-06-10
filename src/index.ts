@@ -1,3 +1,37 @@
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { SeverityNumber } from "@opentelemetry/api-logs";
+import { meter, otelLogger, shutdownTelemetry, withSpan } from "./telemetry";
+
+// url.full span attributes must not carry userinfo credentials (OTel semconv)
+function sanitizeUrl(url: string): string {
+	try {
+		const u = new URL(url);
+		u.username = "";
+		u.password = "";
+		return u.toString();
+	} catch {
+		return url;
+	}
+}
+
+// Metric instruments
+const httpRequestDuration = meter.createHistogram(
+	"reji_cleaner.http.client.duration",
+	{ description: "Duration of registry HTTP requests", unit: "ms" },
+);
+const manifestsDeletedCounter = meter.createCounter(
+	"reji_cleaner.manifests.deleted",
+	{ description: "Number of manifests deleted (or would be in dry-run)" },
+);
+const manifestsKeptCounter = meter.createCounter(
+	"reji_cleaner.manifests.kept",
+	{ description: "Number of manifests kept" },
+);
+const repositoriesProcessedCounter = meter.createCounter(
+	"reji_cleaner.repositories.processed",
+	{ description: "Number of repositories processed" },
+);
+
 // Configuration interface
 interface Config {
 	registryUrl: string;
@@ -132,6 +166,19 @@ class DockerRegistryClient {
 		const color = levelColors[level];
 		const levelText = level.toUpperCase().padEnd(7);
 		console.log(`${color}[${levelText}]${colors.reset} ${message}`);
+
+		const severities = {
+			info: SeverityNumber.INFO,
+			warn: SeverityNumber.WARN,
+			error: SeverityNumber.ERROR,
+			success: SeverityNumber.INFO,
+		};
+		otelLogger.emit({
+			severityNumber: severities[level],
+			severityText: level.toUpperCase(),
+			// biome-ignore lint/suspicious/noControlCharactersInRegex: strip ANSI color codes from telemetry
+			body: message.replace(/\x1b\[[0-9;]*m/g, ""),
+		});
 	}
 
 	private getHeaders(additionalHeaders?: HeadersInit): HeadersInit {
@@ -151,9 +198,39 @@ class DockerRegistryClient {
 		return headers;
 	}
 
+	// fetch wrapper that records a client span and request duration metric
+	private async otelFetch(url: string, init?: RequestInit): Promise<Response> {
+		const method = init?.method || "GET";
+		return withSpan(
+			`HTTP ${method}`,
+			{
+				kind: SpanKind.CLIENT,
+				attributes: {
+					"http.request.method": method,
+					"url.full": sanitizeUrl(url),
+				},
+			},
+			async (span) => {
+				const start = performance.now();
+				try {
+					const response = await fetch(url, init);
+					span.setAttribute("http.response.status_code", response.status);
+					if (response.status >= 400) {
+						span.setStatus({ code: SpanStatusCode.ERROR });
+					}
+					return response;
+				} finally {
+					httpRequestDuration.record(performance.now() - start, {
+						"http.request.method": method,
+					});
+				}
+			},
+		);
+	}
+
 	async checkAPI(): Promise<boolean> {
 		try {
-			const response = await fetch(`${this.config.registryUrl}/v2/`, {
+			const response = await this.otelFetch(`${this.config.registryUrl}/v2/`, {
 				headers: this.getHeaders(),
 			});
 			return response.ok;
@@ -169,9 +246,12 @@ class DockerRegistryClient {
 		}
 
 		try {
-			const response = await fetch(`${this.config.registryUrl}/v2/_catalog`, {
-				headers: this.getHeaders(),
-			});
+			const response = await this.otelFetch(
+				`${this.config.registryUrl}/v2/_catalog`,
+				{
+					headers: this.getHeaders(),
+				},
+			);
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}
@@ -185,7 +265,7 @@ class DockerRegistryClient {
 
 	async getTags(repository: string): Promise<string[]> {
 		try {
-			const response = await fetch(
+			const response = await this.otelFetch(
 				`${this.config.registryUrl}/v2/${repository}/tags/list`,
 				{
 					headers: this.getHeaders(),
@@ -207,7 +287,7 @@ class DockerRegistryClient {
 		reference: string,
 	): Promise<string | null> {
 		try {
-			const response = await fetch(
+			const response = await this.otelFetch(
 				`${this.config.registryUrl}/v2/${repository}/manifests/${reference}`,
 				{
 					method: "HEAD",
@@ -233,7 +313,7 @@ class DockerRegistryClient {
 		reference: string,
 	): Promise<DockerManifest | null> {
 		try {
-			const response = await fetch(
+			const response = await this.otelFetch(
 				`${this.config.registryUrl}/v2/${repository}/manifests/${reference}`,
 				{
 					headers: this.getHeaders(),
@@ -257,7 +337,7 @@ class DockerRegistryClient {
 		digest: string,
 	): Promise<DockerConfig | null> {
 		try {
-			const response = await fetch(
+			const response = await this.otelFetch(
 				`${this.config.registryUrl}/v2/${repository}/blobs/${digest}`,
 				{
 					headers: this.getHeaders(),
@@ -281,7 +361,7 @@ class DockerRegistryClient {
 		digest: string,
 	): Promise<ReferrersResponse | null> {
 		try {
-			const response = await fetch(
+			const response = await this.otelFetch(
 				`${this.config.registryUrl}/v2/${repository}/referrers/${digest}`,
 				{
 					headers: this.getHeaders(),
@@ -316,7 +396,7 @@ class DockerRegistryClient {
 			if (!attestationManifest) return null;
 
 			// Fetch the attestation blob
-			const response = await fetch(
+			const response = await this.otelFetch(
 				`${this.config.registryUrl}/v2/${repository}/blobs/${attestationManifest.digest}`,
 				{
 					headers: this.getHeaders(),
@@ -449,7 +529,7 @@ class DockerRegistryClient {
 
 		try {
 			this.log("info", `Deleting manifest: ${repository}@${digest}`);
-			const response = await fetch(
+			const response = await this.otelFetch(
 				`${this.config.registryUrl}/v2/${repository}/manifests/${digest}`,
 				{
 					method: "DELETE",
@@ -470,6 +550,29 @@ class DockerRegistryClient {
 	}
 
 	async processRepository(
+		repository: string,
+	): Promise<{ deleted: number; kept: number }> {
+		return withSpan(
+			"processRepository",
+			{ attributes: { "reji_cleaner.repository": repository } },
+			async (span) => {
+				const result = await this.processRepositoryInner(repository);
+				span.setAttributes({
+					"reji_cleaner.manifests.deleted": result.deleted,
+					"reji_cleaner.manifests.kept": result.kept,
+				});
+				repositoriesProcessedCounter.add(1);
+				manifestsDeletedCounter.add(result.deleted, {
+					repository,
+					dry_run: String(this.config.dryRun),
+				});
+				manifestsKeptCounter.add(result.kept, { repository });
+				return result;
+			},
+		);
+	}
+
+	private async processRepositoryInner(
 		repository: string,
 	): Promise<{ deleted: number; kept: number }> {
 		this.log(
@@ -634,11 +737,24 @@ class DockerRegistryClient {
 	}
 
 	async cleanup(): Promise<void> {
+		return withSpan(
+			"cleanup",
+			{
+				attributes: {
+					"reji_cleaner.registry_url": sanitizeUrl(this.config.registryUrl),
+					"reji_cleaner.dry_run": this.config.dryRun,
+				},
+			},
+			() => this.cleanupInner(),
+		);
+	}
+
+	private async cleanupInner(): Promise<void> {
 		this.log("info", "=".repeat(60));
 		this.log("info", "Docker Registry Cleanup Script");
 		this.log(
 			"info",
-			`Registry URL: ${colors.cyan}${this.config.registryUrl}${colors.reset}`,
+			`Registry URL: ${colors.cyan}${sanitizeUrl(this.config.registryUrl)}${colors.reset}`,
 		);
 		this.log(
 			"info",
@@ -653,7 +769,8 @@ class DockerRegistryClient {
 		// Check API connection
 		if (!(await this.checkAPI())) {
 			this.log("error", "Failed to connect to Docker Registry API");
-			process.exit(1);
+			// Throw instead of process.exit so pending telemetry can be flushed
+			throw new Error("Failed to connect to Docker Registry API");
 		}
 
 		// Get repository list
@@ -728,7 +845,10 @@ async function main() {
 			`${colors.red}[ERROR]${colors.reset} Unexpected error:`,
 			error,
 		);
-		process.exit(1);
+		process.exitCode = 1;
+	} finally {
+		// Flush traces/metrics/logs before the short-lived process exits
+		await shutdownTelemetry();
 	}
 }
 
