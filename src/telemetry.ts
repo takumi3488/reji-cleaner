@@ -8,9 +8,9 @@ import {
 	trace,
 } from "@opentelemetry/api";
 import { type Logger, logs } from "@opentelemetry/api-logs";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-grpc";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
 import {
 	defaultResource,
 	resourceFromAttributes,
@@ -32,7 +32,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 const SERVICE_NAME = Bun.env.OTEL_SERVICE_NAME || "reji-cleaner";
 
 // Without an explicit endpoint the exporters would silently retry against
-// the default http://localhost:4318 and delay process exit by ~10s, so
+// the default http://localhost:4317 and delay process exit by ~10s, so
 // telemetry stays disabled (no-op providers) unless one is configured.
 const telemetryEnabled = Boolean(
 	Bun.env.OTEL_EXPORTER_OTLP_ENDPOINT ||
@@ -46,7 +46,7 @@ let meterProvider: MeterProvider | undefined;
 let loggerProvider: LoggerProvider | undefined;
 
 if (telemetryEnabled) {
-	// OTLP exporters read OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS
+	// OTLP gRPC exporters read OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS
 	// from the environment automatically; only the resource is configured here.
 	const resource = defaultResource().merge(
 		resourceFromAttributes({ [ATTR_SERVICE_NAME]: SERVICE_NAME }),
