@@ -199,7 +199,11 @@ class DockerRegistryClient {
 	}
 
 	// fetch wrapper that records a client span and request duration metric
-	private async otelFetch(url: string, init?: RequestInit): Promise<Response> {
+	private async otelFetch(
+		url: string,
+		init?: RequestInit,
+		options?: { expectedStatuses?: number[] },
+	): Promise<Response> {
 		const method = init?.method || "GET";
 		return withSpan(
 			`HTTP ${method}`,
@@ -215,7 +219,10 @@ class DockerRegistryClient {
 				try {
 					const response = await fetch(url, init);
 					span.setAttribute("http.response.status_code", response.status);
-					if (response.status >= 400) {
+					if (
+						response.status >= 400 &&
+						!options?.expectedStatuses?.includes(response.status)
+					) {
 						span.setStatus({ code: SpanStatusCode.ERROR });
 					}
 					return response;
@@ -366,6 +373,9 @@ class DockerRegistryClient {
 				{
 					headers: this.getHeaders(),
 				},
+				// 404 means no referrers exist for this manifest, which is normal per
+				// OCI dist-spec 1.1 — don't surface it as an error span.
+				{ expectedStatuses: [404] },
 			);
 			if (!response.ok) {
 				return null;
