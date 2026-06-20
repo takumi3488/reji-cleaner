@@ -51,9 +51,17 @@ function isSemverTag(tag: string): boolean {
 	return SEMVER_PATTERN.test(tag);
 }
 
+// Buildcache tag pattern — excluded from deletion entirely.
+// Matches: buildcache, buildcache-*
+const BUILDCACHE_PATTERN = /^buildcache(-.*)?$/i;
+
+function isBuildcacheTag(tag: string): boolean {
+	return BUILDCACHE_PATTERN.test(tag);
+}
+
 // Cache tag pattern to match cache-related tags
-// Matches: cache, cache-*, buildcache-*, *-cache, etc.
-const CACHE_PATTERN = /^(cache|buildcache)(-.*)?$|^.*-cache$/i;
+// Matches: cache, cache-*, *-cache, etc.
+const CACHE_PATTERN = /^cache(-.*)?$|^.*-cache$/i;
 
 function isCacheTag(tag: string): boolean {
 	return CACHE_PATTERN.test(tag);
@@ -604,7 +612,11 @@ class DockerRegistryClient {
 			const digest = await this.getManifestDigest(repository, tag);
 			if (!digest) continue;
 
-			const created = await this.getTagCreatedTime(repository, tag);
+			// buildcache tags are kept regardless of creation time, so skip the
+			// expensive manifest/config/referrers chain that getTagCreatedTime walks.
+			const created = isBuildcacheTag(tag)
+				? null
+				: await this.getTagCreatedTime(repository, tag);
 			tagInfoList.push({ name: tag, digest, created: created || undefined });
 
 			// Group tags by digest
@@ -629,14 +641,17 @@ class DockerRegistryClient {
 			return b.created.localeCompare(a.created);
 		};
 
-		// Categorize tags into semver, cache, timestamp, and others
+		// Categorize tags into buildcache, semver, cache, timestamp, and others
+		const buildcacheTags: TagInfo[] = [];
 		const semverTags: TagInfo[] = [];
 		const cacheTags: TagInfo[] = [];
 		const timestampTags: TagInfo[] = [];
 		const otherTags: TagInfo[] = [];
 
 		for (const tag of tagInfoList) {
-			if (isSemverTag(tag.name)) {
+			if (isBuildcacheTag(tag.name)) {
+				buildcacheTags.push(tag);
+			} else if (isSemverTag(tag.name)) {
 				semverTags.push(tag);
 			} else if (isCacheTag(tag.name)) {
 				cacheTags.push(tag);
@@ -654,10 +669,17 @@ class DockerRegistryClient {
 		otherTags.sort(sortByCreated);
 
 		// Apply retention rules:
+		// - Buildcache tags: keep all (excluded from deletion)
 		// - Semver tags: keep only the latest 1
 		// - Cache tags: keep only the latest 1
 		// - Other tags: keep up to retentionCount (default 5)
 		const tagsToKeep: TagInfo[] = [];
+
+		// Keep all buildcache tags
+		if (buildcacheTags.length > 0) {
+			tagsToKeep.push(...buildcacheTags);
+			this.log("info", `Buildcache tags: keeping all ${buildcacheTags.length}`);
+		}
 
 		// Keep latest semver tag (1)
 		if (semverTags.length > 0) {
@@ -704,7 +726,9 @@ class DockerRegistryClient {
 		);
 		for (const tag of tagsToKeep) {
 			let typeIndicator = "";
-			if (isSemverTag(tag.name)) {
+			if (isBuildcacheTag(tag.name)) {
+				typeIndicator = ` ${colors.yellow}[buildcache]${colors.reset}`;
+			} else if (isSemverTag(tag.name)) {
 				typeIndicator = ` ${colors.magenta}[semver]${colors.reset}`;
 			} else if (isCacheTag(tag.name)) {
 				typeIndicator = ` ${colors.cyan}[cache]${colors.reset}`;
@@ -772,7 +796,7 @@ class DockerRegistryClient {
 		);
 		this.log(
 			"info",
-			`Tag retention: semver=${colors.magenta}1${colors.reset}, cache=${colors.cyan}1${colors.reset}, other=${colors.green}${this.config.retentionCount}${colors.reset}`,
+			`Tag retention: buildcache=${colors.yellow}all${colors.reset}, semver=${colors.magenta}1${colors.reset}, cache=${colors.cyan}1${colors.reset}, other=${colors.green}${this.config.retentionCount}${colors.reset}`,
 		);
 		this.log("info", "=".repeat(60));
 
