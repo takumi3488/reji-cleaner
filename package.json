@@ -8,7 +8,7 @@
     "lint:fix": "biome check --write --unsafe ./src"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.2",
+    "@biomejs/biome": "2.5.3",
     "@types/bun": "latest"
   },
   "peerDependencies": {
