@@ -103,6 +103,11 @@ bun test
 - **Latest tag protection**: The latest tag (based on creation timestamp) for each repository is automatically protected
 - **Authentication**: Configure appropriate credentials for private registries
 
+## Support
+
+If you find reji-cleaner useful, consider [sponsoring takumi3488](https://github.com/sponsors/takumi3488)
+to support its development and maintenance.
+
 ## License
 
 MIT
